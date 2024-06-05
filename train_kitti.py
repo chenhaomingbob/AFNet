@@ -324,8 +324,8 @@ if __name__ == "__main__":
         #                                           backend='nccl')
         print('opts.local_rank', opts.local_rank)
         torch.cuda.set_device(opts.local_rank)
-        dist.init_process_group("nccl", rank=opts.local_rank, world_size=3)
-        opts.ngpus_per_node = 3
+        dist.init_process_group("nccl", rank=opts.local_rank, world_size=2)
+        opts.ngpus_per_node = 2
         opts.gpu = opts.local_rank
         print("Use GPU: {}/{} for training".format(opts.gpu,
                                                    opts.ngpus_per_node))

@@ -22,7 +22,6 @@ from utils import npy
 import json
 
 
-
 class DDAD_kitti(data.Dataset):
     def __init__(self, opt, is_train):
         super(DDAD_kitti, self).__init__()
@@ -51,7 +50,7 @@ class DDAD_kitti(data.Dataset):
 
         # image resolution
         self.img_H = self.opt.height  # 352
-        self.img_W = self.opt.width   # 1216
+        self.img_W = self.opt.width  # 1216
 
     def __len__(self):
         return len(self.filenames)
@@ -73,8 +72,8 @@ class DDAD_kitti(data.Dataset):
         IntM[2, 2] = 1.
         IntM[0, 0] = IntM_[0, 0]
         IntM[1, 1] = IntM_[1, 1]
-        IntM[0, 2] = (IntM_[0, 2] - left_margin) 
-        IntM[1, 2] = (IntM_[1, 2] - top_margin) 
+        IntM[0, 2] = (IntM_[0, 2] - left_margin)
+        IntM[1, 2] = (IntM_[1, 2] - top_margin)
 
         IntM = IntM.astype(np.float32)
         return IntM
@@ -88,7 +87,7 @@ class DDAD_kitti(data.Dataset):
         # identify the neighbor views
         img_idx_list = [img_idx + i for i in self.window_idx_list]
         p_data = pykitti.raw(self.dataset_path + '/rawdata', date, drive, frames=img_idx_list)
-
+        depth_path = os.path.join(self.dataset_path, 'depth_gt')
         # cam intrinsics
         cam_intrins = self.get_cam_intrinsics(p_data)
 
@@ -119,17 +118,18 @@ class DDAD_kitti(data.Dataset):
             img = img.crop((left_margin, top_margin, left_margin + 1216, top_margin + 352))
 
             # to tensor
-            img = np.array(img).astype(np.float32) / 255.0      # (H, W, 3)
+            img = np.array(img).astype(np.float32) / 255.0  # (H, W, 3)
             img_ori = torch.from_numpy(img).permute(2, 0, 1)
             if color_aug:
                 img = self.augment_image(img, aug_gamma, aug_brightness, aug_colors)
-            img = torch.from_numpy(img).permute(2, 0, 1)        # (3, H, W)
+            img = torch.from_numpy(img).permute(2, 0, 1)  # (3, H, W)
             img = self.normalize(img)
 
             # read dmap (only for the ref img)
             if i == self.img_idx_center:
-                dmap_path = self.dataset_path + '/{}/{}/proj_depth/groundtruth/image_02/{}'.format(mode, scene_name,
-                                                                                                   img_name)
+                # dmap_path = self.dataset_path + '/{}/{}/proj_depth/groundtruth/image_02/{}'.format(mode, scene_name,
+                #                                                                                    img_name)
+                dmap_path = depth_path + '/{}/{}/proj_depth/groundtruth/image_02/{}'.format(date, scene_name, img_name)
                 gt_dmap = Image.open(dmap_path).crop((left_margin, top_margin, left_margin + 1216, top_margin + 352))
                 gt_dmap = np.array(gt_dmap)[:, :, np.newaxis].astype(np.float32)  # (H, W, 1)
                 gt_dmap = gt_dmap / 256.0
@@ -167,7 +167,6 @@ class DDAD_kitti(data.Dataset):
         inputs[("pose", 2)] = data_array[2]['extM']
         inputs[("img_ori", 2, 0)] = data_array[2]['img_ori']
 
-
         inputs = self.get_K(cam_intrins, inputs)
 
         inputs = self.compute_projection_matrix(inputs)
@@ -196,8 +195,8 @@ class DDAD_kitti(data.Dataset):
         K_pool = {}
         ho, wo = self.opt.height, self.opt.width
         for i in range(6):
-            K_pool[(ho // 2**i, wo // 2**i)] = K.copy().astype('float32')
-            K_pool[(ho // 2**i, wo // 2**i)][:2, :] /= 2**i
+            K_pool[(ho // 2 ** i, wo // 2 ** i)] = K.copy().astype('float32')
+            K_pool[(ho // 2 ** i, wo // 2 ** i)][:2, :] /= 2 ** i
 
         inputs['K_pool'] = K_pool
 
@@ -210,9 +209,8 @@ class DDAD_kitti(data.Dataset):
         inputs[("inv_K", 0)] = torch.from_numpy(inv_K.astype('float32'))
 
         inputs[("K", 0)] = torch.from_numpy(K.astype('float32'))
-    
-        return inputs
 
+        return inputs
 
     def compute_projection_matrix(self, inputs):
         for i in range(3):

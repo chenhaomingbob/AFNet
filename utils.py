@@ -17,38 +17,43 @@ import subprocess
 import matplotlib
 import matplotlib.pyplot as plt
 
-def gray_2_colormap_np_2(img, cmap = 'rainbow', max = None):
+
+def gray_2_colormap_np_2(img, cmap='rainbow', max=None):
     img = img.squeeze()
     assert img.ndim == 2
-    img[img<0] = 0
+    img[img < 0] = 0
     mask_invalid = img < 1e-10
     if max == None:
         img = img / (img.max() + 1e-8)
     else:
-        img = img/(max + 1e-8)
+        img = img / (max + 1e-8)
 
     norm = matplotlib.colors.Normalize(vmin=0, vmax=1.1)
     cmap_m = matplotlib.cm.get_cmap(cmap)
     map = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap_m)
-    colormap = (map.to_rgba(img)[:,:,:3]*255).astype(np.uint8)
+    colormap = (map.to_rgba(img)[:, :, :3] * 255).astype(np.uint8)
     colormap[mask_invalid] = 0
 
     return colormap
 
-def gray_2_colormap_np(img, cmap = 'rainbow', max = None):
+
+def gray_2_colormap_np(img, cmap='rainbow', max=None):
     img = img.cpu().detach().numpy().squeeze()
     assert img.ndim == 2
-    img[img<0] = 0
+    img[img < 0] = 0
     mask_invalid = img < 1e-10
     if max == None:
         img = img / (img.max() + 1e-8)
     else:
-        img = img/(max + 1e-8)
+        img = img / (max + 1e-8)
 
     norm = matplotlib.colors.Normalize(vmin=0, vmax=1.1)
-    cmap_m = matplotlib.cm.get_cmap(cmap)
+    # cmap_m = matplotlib.cm.get_cmap(cmap)
+    # cmap_m = matplotlib.cm.get_cmap(cmap)
+    cmap_m = matplotlib.colormaps[cmap]  # matplotlib>=3.9.0
+
     map = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap_m)
-    colormap = (map.to_rgba(img)[:,:,:3]*255).astype(np.uint8)
+    colormap = (map.to_rgba(img)[:, :, :3] * 255).astype(np.uint8)
     colormap[mask_invalid] = 0
 
     return colormap
@@ -77,7 +82,7 @@ def plot(xs,
     lh = []
     for i in range(nline):
         if stds is not None:
-            #l, _, _= ax1.errorbar(xs, ys[i], yerr=stds[i], linewidth=4, marker=MARKERS[0], markersize=1, )
+            # l, _, _= ax1.errorbar(xs, ys[i], yerr=stds[i], linewidth=4, marker=MARKERS[0], markersize=1, )
             l, = ax1.plot(
                 xs,
                 ys[i],
@@ -185,6 +190,7 @@ def angle_axis_to_rotation_matrix(angle_axis):
         >>> input = torch.rand(1, 3)  # Nx3
         >>> output = tgm.angle_axis_to_rotation_matrix(input)  # Nx4x4
     """
+
     def _compute_rotation_matrix(angle_axis, theta2, eps=1e-6):
         # We want to be careful to only evaluate the square root if the
         # norm of the angle_axis vector is greater than zero. Otherwise
@@ -278,7 +284,7 @@ def custom_collate(batch):
     elem = batch[0]
     elem_type = type(elem)
     if isinstance(batch, list) and isinstance(elem, tuple):
-        #data = torch.cat((x[0] for x in batch))
+        # data = torch.cat((x[0] for x in batch))
         return [x[0] for x in batch]
     if type(elem) == tuple and elem[1] == 'varlen':
         return [x[0] for x in batch]
@@ -311,10 +317,10 @@ def custom_collate(batch):
             return torch.as_tensor(batch)
     elif isinstance(elem, float):
         return torch.tensor(batch, dtype=torch.float64)
-    #elif isinstance(elem, int_classes):
+    # elif isinstance(elem, int_classes):
     elif isinstance(elem, int):
         return torch.tensor(batch)
-    #elif isinstance(elem, string_classes):
+    # elif isinstance(elem, string_classes):
     elif isinstance(elem, str):
         return batch
     elif isinstance(elem, container_abcs.Mapping):
@@ -352,7 +358,7 @@ def default_collatev1_1(batch):
     elem = batch[0]
     elem_type = type(batch[0])
     if isinstance(batch, list) and isinstance(elem, tuple):
-        #data = torch.cat((x[0] for x in batch))
+        # data = torch.cat((x[0] for x in batch))
         return [x[0] for x in batch]
     if isinstance(batch[0], torch.Tensor):
         out = None
@@ -386,10 +392,10 @@ def default_collatev1_1(batch):
             return numpy_type_map[elem.dtype.name](list(map(py_type, batch)))
     elif isinstance(batch[0], float):
         return torch.tensor(batch, dtype=torch.float64)
-    #elif isinstance(batch[0], int_classes):
+    # elif isinstance(batch[0], int_classes):
     elif isinstance(batch[0], int):
         return torch.tensor(batch)
-    #elif isinstance(batch[0], string_classes):
+    # elif isinstance(batch[0], string_classes):
     elif isinstance(batch[0], str):
         return batch
     elif isinstance(batch[0], container_abcs.Mapping):
@@ -506,7 +512,6 @@ def sec_to_hm_str(t):
 
 
 def write_ply(fn, point, normal=None, color=None):
-
     ply = o3d.geometry.PointCloud()
     ply.points = o3d.utility.Vector3dVector(point)
     if color is not None:

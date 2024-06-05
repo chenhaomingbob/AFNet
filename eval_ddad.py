@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from utils import *
 from hybrid_evaluate_depth import evaluate_depth_maps, compute_errors,compute_errors1,compute_errors_perimage
 import os 
-os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
 def to_gpu(inputs, keys=None):
