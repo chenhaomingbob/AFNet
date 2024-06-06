@@ -14,10 +14,12 @@ import random
 import torch.optim as optim
 from options import MVS2DOptions, EvalCfg
 from trainer_base_kitti import BaseTrainer
-from hybrid_evaluate_depth import evaluate_depth_maps, compute_errors,compute_errors1,compute_errors_perimage
+from hybrid_evaluate_depth import evaluate_depth_maps, compute_errors, compute_errors1, compute_errors_perimage
 from dtu_pyeval import dtu_pyeval
 import pprint
 import torch.distributed as dist
+
+from loguru import logger
 
 
 class Trainer(BaseTrainer):
@@ -125,7 +127,6 @@ class Trainer(BaseTrainer):
     #     for k in dict_pred_2.keys():
     #         total_result_count_2[k] = dict_pred_2['total_count_2']
 
-
     #     for k in dict_pred.keys():
     #         this_tensor = torch.tensor([dict_pred[k], total_result_count[k]]).to(self.device)
     #         this_list = [this_tensor]
@@ -151,7 +152,7 @@ class Trainer(BaseTrainer):
     #     self.set_train()
 
     def val_epoch(self):
-        print("Validation")
+        logger.info("Validation Epoch")
         writer = self.writers['val']
         self.set_eval()
         results_depth = []
@@ -167,7 +168,7 @@ class Trainer(BaseTrainer):
             save_dir=os.path.join(self.log_path, 'eval_%03d' % self.epoch))
         if not os.path.exists(config.save_dir) and self.is_master:
             os.makedirs(config.save_dir)
-        print('evaluation results save to folder %s' % config.save_dir)
+        logger.info('evaluation results save to folder %s' % config.save_dir)
         times = []
         val_stats = defaultdict(list)
         total_result_sum = {}
@@ -178,7 +179,7 @@ class Trainer(BaseTrainer):
                 if self.opt.val_epoch_size != -1 and batch_idx >= self.opt.val_epoch_size:
                     break
                 if batch_idx % 100 == 0:
-                    print(batch_idx, len(self.val_loader))
+                    logger.info(f"batch_idx:{batch_idx} length of val {len(self.val_loader)}")
                 # filenames = inputs["filenames"]
                 losses, outputs = self.process_batch(inputs, 'val')
                 # b = len(inputs["filenames"])
@@ -188,12 +189,14 @@ class Trainer(BaseTrainer):
                 pred_depth_2 = npy(outputs[('depth_pred_2', s)])
                 depth_gt = npy(inputs[('depth_gt', 0, s)])
                 mask = np.logical_and(depth_gt > config.MIN_DEPTH,
-                              depth_gt < config.MAX_DEPTH)
-                error_temp = compute_errors_perimage(depth_gt[mask], pred_depth[mask], config.MIN_DEPTH, config.MAX_DEPTH)
-                error_temp_2_ = compute_errors_perimage(depth_gt[mask], pred_depth_2[mask], config.MIN_DEPTH, config.MAX_DEPTH)
+                                      depth_gt < config.MAX_DEPTH)
+                error_temp = compute_errors_perimage(depth_gt[mask], pred_depth[mask], config.MIN_DEPTH,
+                                                     config.MAX_DEPTH)
+                error_temp_2_ = compute_errors_perimage(depth_gt[mask], pred_depth_2[mask], config.MIN_DEPTH,
+                                                        config.MAX_DEPTH)
 
                 error_temp_2 = {}
-                for k,v in error_temp_2_.items():
+                for k, v in error_temp_2_.items():
                     new_k = k + '_2'
                     error_temp_2[new_k] = error_temp_2_[k]
 
@@ -201,9 +204,9 @@ class Trainer(BaseTrainer):
                 error_temp_all.update(error_temp)
                 error_temp_all.update(error_temp_2)
 
-                for k,v in error_temp_all.items():
-                    if not isinstance(v,float):
-                        v=v.items()
+                for k, v in error_temp_all.items():
+                    if not isinstance(v, float):
+                        v = v.items()
                     if k in total_result_sum:
                         total_result_sum[k] = total_result_sum[k] + v
                     else:
@@ -211,23 +214,27 @@ class Trainer(BaseTrainer):
                 self.eval_step += 1
 
                 if self.eval_step % 80 == 0 and self.is_master:
-                    writer.add_image('image0', inputs[("img_ori", 0, 0)][0], global_step=self.eval_step, walltime=None, dataformats='CHW')
-                    writer.add_image('image1', inputs[("img_ori", 1, 0)][0], global_step=self.eval_step, walltime=None, dataformats='CHW')
-                    writer.add_image('image2', inputs[("img_ori", 2, 0)][0], global_step=self.eval_step, walltime=None, dataformats='CHW')
+                    writer.add_image('image0', inputs[("img_ori", 0, 0)][0], global_step=self.eval_step, walltime=None,
+                                     dataformats='CHW')
+                    writer.add_image('image1', inputs[("img_ori", 1, 0)][0], global_step=self.eval_step, walltime=None,
+                                     dataformats='CHW')
+                    writer.add_image('image2', inputs[("img_ori", 2, 0)][0], global_step=self.eval_step, walltime=None,
+                                     dataformats='CHW')
                     depth_gt = gray_2_colormap_np(inputs[("depth_gt", 0, 0)][0][0])
                     writer.add_image('depth_gt', depth_gt, global_step=self.eval_step, walltime=None, dataformats='HWC')
                     depth_pred = gray_2_colormap_np(outputs[('depth_pred', 0)][0][0])
-                    writer.add_image('depth_pred', depth_pred, global_step=self.eval_step, walltime=None, dataformats='HWC')
+                    writer.add_image('depth_pred', depth_pred, global_step=self.eval_step, walltime=None,
+                                     dataformats='HWC')
                     depth_pred_2 = gray_2_colormap_np(outputs[('depth_pred_2', 0)][0][0])
-                    writer.add_image('depth_pred_2', depth_pred_2, global_step=self.eval_step, walltime=None, dataformats='HWC')
+                    writer.add_image('depth_pred_2', depth_pred_2, global_step=self.eval_step, walltime=None,
+                                     dataformats='HWC')
 
-        # print('total_count', dict_pred['total_count'])
-        # print('total_count_2', dict_pred_2['total_count_2'])
-        # print('abs_rel', dict_pred['abs_rel'])
+            # print('total_count', dict_pred['total_count'])
+            # print('total_count_2', dict_pred_2['total_count_2'])
+            # print('abs_rel', dict_pred['abs_rel'])
 
             for k in total_result_sum.keys():
                 total_result_count[k] = total_result_sum['valid_number']
-
 
             for k in total_result_sum.keys():
                 this_tensor = torch.tensor([total_result_sum[k], total_result_count[k]]).to(self.device)
@@ -265,7 +272,6 @@ class Trainer(BaseTrainer):
         depth_pred_2 = outputs[('depth_pred_2', s)]
         depth_gt = inputs[('depth_gt', 0, s)]
 
-
         valid_depth = (depth_gt > 0)
 
         # if self.opt.pred_conf:
@@ -277,6 +283,11 @@ class Trainer(BaseTrainer):
         #     loss_depth = ((depth_pred - depth_gt).abs() / conf_pred +
         #                   log_conf_pred)[valid_depth].mean()
         # else:
+
+        from loguru import logger
+        # logger.info(f"depth_pred shape:{depth_pred.shape}; depth_gt shape:{depth_gt.shape};")
+        # logger.info(f"depth_pred_2 shape:{depth_pred_2.shape}; depth_gt shape:{depth_gt.shape};")
+
         loss_depth = (depth_pred[valid_depth] - depth_gt[valid_depth]).abs().mean()
 
         loss_depth_2 = (depth_pred_2[valid_depth] - depth_gt[valid_depth]).abs().mean()

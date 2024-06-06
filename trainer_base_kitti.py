@@ -19,6 +19,7 @@ from torch.autograd import Variable
 import torch.optim.lr_scheduler as lr_sched
 from options import MVS2DOptions
 import torch.backends.cudnn as cudnn
+from loguru import logger
 
 cudnn.benchmark = True
 
@@ -34,7 +35,7 @@ def worker_init_fn(worker_id):
 
 
 def file_remove_readonly(func, path, execinfo):
-    os.chmod(path, stat.S_IWUSR)#修改文件权限
+    os.chmod(path, stat.S_IWUSR)  # 修改文件权限
     func(path)
 
 
@@ -50,7 +51,6 @@ class BaseTrainer(object):
         self.opt.is_master = self.opt.gpu == 0
         self.device = self.opt.gpu
 
-        
         # base_dir = '.'
         # self.opt.log_dir = os.path.join(base_dir, self.opt.log_dir)
         self.log_path = os.path.join(self.opt.log_dir, self.opt.model_name)
@@ -111,9 +111,9 @@ class BaseTrainer(object):
 
             self.num_total_steps = len(self.train_loader) * self.opt.num_epochs
             print("There are {:d} training items and {:d} validation items\n".
-                  format(
-                      len(self.train_loader) * self.opt.batch_size,
-                      len(self.val_loader) * 1))
+            format(
+                len(self.train_loader) * self.opt.batch_size,
+                len(self.val_loader) * 1))
 
     # def build_optimizer(self):
     #     optimizer = optim.Adam(self.model.parameters(),
@@ -121,7 +121,6 @@ class BaseTrainer(object):
     #                            weight_decay=self.opt.WEIGHT_DECAY)
 
     #     self.model_optimizer = optimizer
-
 
     # def build_scheduler(self):
     #     total_iters_each_epoch = len(self.train_loader)
@@ -147,11 +146,10 @@ class BaseTrainer(object):
         total_steps = total_iters_each_epoch * self.opt.num_epochs
         optimizer = optim.AdamW(self.model.parameters(), lr=self.opt.LR, weight_decay=.00001, eps=1e-8)
 
-        scheduler = optim.lr_scheduler.OneCycleLR(optimizer, self.opt.LR, total_steps+100,
-                pct_start=0.01, cycle_momentum=False, anneal_strategy='linear')
+        scheduler = optim.lr_scheduler.OneCycleLR(optimizer, self.opt.LR, total_steps + 100,
+                                                  pct_start=0.01, cycle_momentum=False, anneal_strategy='linear')
         self.model_lr_scheduler = scheduler
         self.model_optimizer = optimizer
-
 
     def to_gpu(self, inputs, keys=None):
         if keys == None:
@@ -204,13 +202,14 @@ class BaseTrainer(object):
         else:
             self.val_sampler = None
         self.val_loader = DataLoader(val_dataset,
-                                       self.opt.batch_size,
-                                       shuffle=False,
-                                       num_workers=self.opt.num_workers,
-                                       pin_memory=True,
-                                       worker_init_fn=worker_init_fn,
-                                       drop_last=False,
-                                       sampler=self.val_sampler)
+                                     1,
+                                     # self.opt.batch_size,
+                                     shuffle=False,
+                                     num_workers=self.opt.num_workers,
+                                     pin_memory=True,
+                                     worker_init_fn=worker_init_fn,
+                                     drop_last=False,
+                                     sampler=self.val_sampler)
 
         # val_dataset = DDAD(self.opt, False)
         # self.val_sampler = None
@@ -236,7 +235,7 @@ class BaseTrainer(object):
         training_time_left = (self.num_total_steps / self.step -
                               1.0) * time_sofar if self.step > 0 else 0
         print_string = "epoch {:>3} | batch {:>6}/{:>6} | ops/s: {:5.1f} | steps/s: {:5.1f} | t_data/t_op: {:5.1f} " + \
-                " | loss: {:.5f} | time elapsed: {} | time left: {} | lr: {:.7f}"
+                       " | loss: {:.5f} | time elapsed: {} | time left: {} | lr: {:.7f}"
         self.log_string(
             print_string.format(self.epoch, batch_idx, len(self.train_loader),
                                 ops_per_sec, steps_per_sec,
@@ -247,7 +246,7 @@ class BaseTrainer(object):
 
     def train_epoch(self):
         if self.opt.is_master:
-            print("Training")
+            logger.info("Training Epoch")
             self.writers['train'].add_scalar(
                 "lr", self.model_optimizer.param_groups[0]['lr'], self.step)
         self.set_train()
@@ -336,18 +335,19 @@ class BaseTrainer(object):
     def train(self):
         self.start_time = time.time()
         if self.opt.is_master:
-            print("Total epoch: %d " % self.opt.num_epochs)
-            print("train loader size: %d " % len(self.train_loader))
-            print("val loader size: %d " % len(self.val_loader))
-            print("log_frequency: %d " % self.opt.log_frequency)
+            logger.info("Total epoch: %d " % self.opt.num_epochs)
+            logger.info("train loader size: %d " % len(self.train_loader))
+            logger.info("val loader size: %d " % len(self.val_loader))
+            logger.info("log_frequency: %d " % self.opt.log_frequency)
         for self.epoch in range(self.opt.num_epochs):
             if self.opt.distributed:
                 self.train_sampler.set_epoch(self.epoch)
+
             self.train_epoch()
             # if self.opt.is_master:
             self.val_epoch()
-            torch.distributed.barrier() 
-            torch.cuda.empty_cache()    
+            torch.distributed.barrier()
+            torch.cuda.empty_cache()
             if self.opt.is_master:
                 self.save_model(monitor_key=self.opt.monitor_key)
 
@@ -363,7 +363,9 @@ class BaseTrainer(object):
     def log_string(self, content):
         with open(self.log_file, 'a') as f:
             f.write(content + '\n')
-        print(content, flush=True)
+        from loguru import logger
+        logger.info(content)
+        # print(content, flush=True)
 
     def log(self, mode, inputs, losses, batch_idx, outputs):
         """Write an event to the tensorboard events file
@@ -376,16 +378,18 @@ class BaseTrainer(object):
                 writer.add_scalar("{}".format(l), v, self.step)
 
         if batch_idx % 150 == 0:
-            writer.add_image('image0', inputs[("img_ori", 0, 0)][0], global_step=self.step, walltime=None, dataformats='CHW')
-            writer.add_image('image1', inputs[("img_ori", 1, 0)][0], global_step=self.step, walltime=None, dataformats='CHW')
-            writer.add_image('image2', inputs[("img_ori", 2, 0)][0], global_step=self.step, walltime=None, dataformats='CHW')
+            writer.add_image('image0', inputs[("img_ori", 0, 0)][0], global_step=self.step, walltime=None,
+                             dataformats='CHW')
+            writer.add_image('image1', inputs[("img_ori", 1, 0)][0], global_step=self.step, walltime=None,
+                             dataformats='CHW')
+            writer.add_image('image2', inputs[("img_ori", 2, 0)][0], global_step=self.step, walltime=None,
+                             dataformats='CHW')
             depth_gt = gray_2_colormap_np(inputs[("depth_gt", 0, 0)][0][0])
             writer.add_image('depth_gt', depth_gt, global_step=self.step, walltime=None, dataformats='HWC')
             depth_pred = gray_2_colormap_np(outputs[('depth_pred', 0)][0][0])
             writer.add_image('depth_pred', depth_pred, global_step=self.step, walltime=None, dataformats='HWC')
             depth_pred_2 = gray_2_colormap_np(outputs[('depth_pred_2', 0)][0][0])
             writer.add_image('depth_pred_2', depth_pred_2, global_step=self.step, walltime=None, dataformats='HWC')
-
 
     def save_opts(self):
         """Save options to disk so we know what we ran this experiment with
