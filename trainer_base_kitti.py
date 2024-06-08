@@ -72,15 +72,18 @@ class BaseTrainer(object):
                 f.write(self.opt.note + '\n')
 
             self.save_opts()
-
+        #
+        logger.info("build dataset")
         self.build_dataset()
 
+        logger.info("build model")
         self.build_model()
 
         # self.build_optimizer()
         self.fetch_optimizer()
 
         if self.opt.load_weights_folder is not None:
+
             self.load_model()
 
         if self.opt.distributed:
@@ -446,12 +449,10 @@ class BaseTrainer(object):
         #             f.write(f"{key} {val}\n")
 
     def load_model(self):
-        self.opt.load_weights_folder = os.path.expanduser(
-            self.opt.load_weights_folder)
+        self.opt.load_weights_folder = os.path.expanduser(self.opt.load_weights_folder)
         assert os.path.isdir(self.opt.load_weights_folder), \
             "Cannot find folder {}".format(self.opt.load_weights_folder)
-        print("loading model from folder {}".format(
-            self.opt.load_weights_folder))
+        logger.info("loading model from folder {}".format(self.opt.load_weights_folder))
 
         try:
             self.epoch = int(
@@ -460,8 +461,7 @@ class BaseTrainer(object):
             self.epoch = 0
 
         try:
-            path = os.path.join(self.opt.load_weights_folder,
-                                "{}.pth".format("model"))
+            path = os.path.join(self.opt.load_weights_folder,"{}.pth".format("model"))
             model_dict = self.model.state_dict()
             pretrained_dict = torch.load(path, 'cpu')
             for k, v in pretrained_dict.items():

@@ -11,7 +11,8 @@ from torch.utils.data import DataLoader
 from datasets.kitti import DDAD_kitti
 from hybrid_evaluate_depth import evaluate_depth_maps, compute_errors,compute_errors1,compute_errors_perimage
 import torch.nn.functional as F
-import os 
+import os
+from loguru import logger
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 def to_gpu(inputs, keys=None):
@@ -46,7 +47,11 @@ data_loader = DataLoader(dataset,
                            drop_last=False,
                            sampler=None)
 model = networks.MVS2D(opt=opts).cuda()
-pretrained_dict = torch.load("pretrained_model/kitti/model_kitti.pth")
+weight_path = "/data/chm/01_codehub/a.Depth_Estimation/AFNet/output/AF_kitti3/models/weights_latest/model_59.pth"
+logger.info("=> loading weights '{}'".format(weight_path))
+pretrained_dict = torch.load(weight_path)
+# pretrained_dict = torch.load("pretrained_model/kitti/model_kitti.pth")
+# pretrained_dict = torch.load("pretrained_model/kitti/model_kitti.pth")
 
 model.load_state_dict(pretrained_dict)
 model.eval()
