@@ -47,7 +47,7 @@ data_loader = DataLoader(dataset,
                            drop_last=False,
                            sampler=None)
 model = networks.MVS2D(opt=opts).cuda()
-weight_path = "/data/chm/01_codehub/a.Depth_Estimation/AFNet/output/AF_kitti3/models/weights_latest/model_59.pth"
+weight_path = "/data/chm/01_codehub/a.Depth_Estimation/AFNet/output/AF_kitti4/models/weights_latest/model_59.pth"
 logger.info("=> loading weights '{}'".format(weight_path))
 pretrained_dict = torch.load(weight_path)
 # pretrained_dict = torch.load("pretrained_model/kitti/model_kitti.pth")
